@@ -1,5 +1,6 @@
 
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class PhysicsGrabber : MonoBehaviour
 {
@@ -39,34 +40,54 @@ public class PhysicsGrabber : MonoBehaviour
         moveableLayer = LayerMask.NameToLayer("Moveable");
 
         if (moveableLayer == -1)
-            Debug.LogError("Create a layer named Moveable!");
+        {
+            Debug.LogError(
+                "PhysicsGrabber: Create a layer named Moveable!"
+            );
+        }
 
         if (playerCamera == null)
-            Debug.LogError("PhysicsGrabber: No camera assigned!");
+        {
+            Debug.LogError(
+                "PhysicsGrabber: No camera assigned!"
+            );
+        }
     }
 
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        // New Unity Input System
+        if (Mouse.current == null)
+            return;
+
+        // Left click to grab
+        if (Mouse.current.leftButton.wasPressedThisFrame)
+        {
             TryGrab();
+        }
 
         if (grabbedBody == null)
             return;
 
-        if (Input.GetMouseButtonUp(0))
+        // Release left click to drop
+        if (Mouse.current.leftButton.wasReleasedThisFrame)
         {
             ReleaseObject();
             return;
         }
 
-        if (Input.GetMouseButtonDown(1))
+        // Right click to throw
+        if (Mouse.current.rightButton.wasPressedThisFrame)
         {
             ThrowObject();
             return;
         }
 
+        // Scroll to change holding distance
+        float scroll = Mouse.current.scroll.ReadValue().y;
+
         currentDistance = Mathf.Clamp(
-            currentDistance + Input.mouseScrollDelta.y * scrollSpeed,
+            currentDistance + scroll * scrollSpeed * 0.01f,
             minHoldDistance,
             maxHoldDistance
         );
@@ -75,7 +96,9 @@ public class PhysicsGrabber : MonoBehaviour
     void FixedUpdate()
     {
         if (grabbedBody != null)
+        {
             MoveGrabbedObject();
+        }
     }
 
     void TryGrab()
@@ -89,12 +112,22 @@ public class PhysicsGrabber : MonoBehaviour
         );
 
         if (showDebug)
-            Debug.DrawRay(ray.origin, ray.direction * grabRange,
-                Color.green, 1f);
+        {
+            Debug.DrawRay(
+                ray.origin,
+                ray.direction * grabRange,
+                Color.green,
+                1f
+            );
+        }
 
-        // Raycast against all layers so walls block grabbing.
-        if (!Physics.Raycast(ray, out RaycastHit hit,
-            grabRange, ~0, QueryTriggerInteraction.Ignore))
+        // Raycast against all layers so walls block grabbing
+        if (!Physics.Raycast(
+            ray,
+            out RaycastHit hit,
+            grabRange,
+            ~0,
+            QueryTriggerInteraction.Ignore))
         {
             if (showDebug)
                 Debug.Log("Grab failed: Nothing was hit.");
@@ -102,11 +135,16 @@ public class PhysicsGrabber : MonoBehaviour
             return;
         }
 
+        // Only grab objects on the Moveable layer
         if (hit.collider.gameObject.layer != moveableLayer)
         {
             if (showDebug)
-                Debug.Log("Grab failed: " + hit.collider.name +
-                    " is not on the Moveable layer.");
+            {
+                Debug.Log(
+                    "Grab failed: " + hit.collider.name +
+                    " is not on the Moveable layer."
+                );
+            }
 
             return;
         }
@@ -116,7 +154,7 @@ public class PhysicsGrabber : MonoBehaviour
         if (rb == null)
         {
             if (showDebug)
-                Debug.Log("Grab failed: Object has no Rigidbody.");
+                Debug.Log("Grab failed: No Rigidbody.");
 
             return;
         }
@@ -138,18 +176,26 @@ public class PhysicsGrabber : MonoBehaviour
         }
 
         grabbedBody = rb;
+
+        // Store the exact point clicked
         localGrabPoint =
             rb.transform.InverseTransformPoint(hit.point);
 
         currentDistance = Mathf.Clamp(
-            holdDistance, minHoldDistance, maxHoldDistance
+            holdDistance,
+            minHoldDistance,
+            maxHoldDistance
         );
 
-        rb.WakeUp();
+        grabbedBody.WakeUp();
 
         if (showDebug)
-            Debug.Log("Grabbed: " + rb.name +
-                " | Mass: " + rb.mass);
+        {
+            Debug.Log(
+                "Grabbed: " + rb.name +
+                " | Mass: " + rb.mass
+            );
+        }
     }
 
     void MoveGrabbedObject()
@@ -162,41 +208,47 @@ public class PhysicsGrabber : MonoBehaviour
             grabbedBody.transform.TransformPoint(localGrabPoint);
 
         Vector3 displacement = target - grabPoint;
+
         Vector3 pointVelocity =
             grabbedBody.GetPointVelocity(grabPoint);
 
-        // Spring force. Heavier objects accelerate more slowly.
+        // Physics spring force
         Vector3 force =
             displacement * springStrength -
             pointVelocity * springDamping;
 
-        // Cap the force so heavy objects cannot be lifted easily.
-        force = Vector3.ClampMagnitude(force, maxGrabForce);
+        // Limit force to simulate object weight
+        force = Vector3.ClampMagnitude(
+            force,
+            maxGrabForce
+        );
 
+        // Heavy objects can only be dragged
         if (grabbedBody.mass > maxLiftableMass)
         {
-            // Heavy objects can only be dragged horizontally.
             force.y = Mathf.Min(force.y, 0f);
         }
 
         grabbedBody.AddForceAtPosition(
-            force, grabPoint, ForceMode.Force
+            force,
+            grabPoint,
+            ForceMode.Force
         );
     }
 
     void ThrowObject()
     {
+        if (grabbedBody == null)
+            return;
+
         Rigidbody rb = grabbedBody;
 
         ReleaseObject();
 
-        if (rb != null)
-        {
-            rb.AddForce(
-                playerCamera.transform.forward * throwImpulse,
-                ForceMode.Impulse
-            );
-        }
+        rb.AddForce(
+            playerCamera.transform.forward * throwImpulse,
+            ForceMode.Impulse
+        );
     }
 
     void ReleaseObject()
@@ -205,7 +257,11 @@ public class PhysicsGrabber : MonoBehaviour
             return;
 
         if (showDebug)
-            Debug.Log("Released: " + grabbedBody.name);
+        {
+            Debug.Log(
+                "Released: " + grabbedBody.name
+            );
+        }
 
         grabbedBody = null;
     }
