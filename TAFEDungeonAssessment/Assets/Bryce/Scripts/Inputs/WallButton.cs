@@ -16,7 +16,8 @@ namespace PuzzleMechanics
     /// A button the player presses with the interact key.
     /// Choose Toggle, Momentary (hold) or Timed in the Inspector.
     ///
-    /// The button's front faces its blue (forward / +Z) axis.
+    /// The same script drives the wall-mounted button (cap pushes in) and the
+    /// pedestal button (cap pushes down). Only 'Press Direction' differs.
     /// </summary>
     public class WallButton : PuzzleActivator, IInteractable
     {
@@ -34,8 +35,12 @@ namespace PuzzleMechanics
         [Tooltip("The part that moves in when the button is pressed (optional).")]
         public Transform buttonCap;
 
-        [Tooltip("How far (metres) the cap moves in when pressed.")]
-        public float pressDepth = 0.04f;
+        [Tooltip("How far (metres) the cap moves when pressed.")]
+        public float pressDepth = 0.03f;
+
+        [Tooltip("Which way the cap moves when pressed, in the button's local space. " +
+                 "(0,0,-1) = into the wall, (0,-1,0) = down into a pedestal.")]
+        public Vector3 pressDirection = Vector3.back;
 
         private Vector3 capOutPosition;
         private float timeLeft;
@@ -103,7 +108,7 @@ namespace PuzzleMechanics
 
             if (buttonCap != null)
             {
-                Vector3 target = IsActive ? capOutPosition + Vector3.back * pressDepth : capOutPosition;
+                Vector3 target = IsActive ? capOutPosition + pressDirection.normalized * pressDepth : capOutPosition;
                 buttonCap.localPosition = Vector3.MoveTowards(buttonCap.localPosition, target, 0.5f * Time.deltaTime);
             }
         }

@@ -14,11 +14,11 @@ namespace PuzzleMechanics
         [Tooltip("Renderers to recolour. If empty, every renderer on this object and its children is used.")]
         public Renderer[] renderers;
 
-        [Tooltip("Colour when OFF.")]
-        public Color offColor = new Color(0.8f, 0.15f, 0.1f);
+        [Tooltip("Colour when OFF (the project's 'inactive' accent colour).")]
+        public Color offColor = new Color(0.15f, 0.35f, 0.9f);
 
-        [Tooltip("Colour when ON.")]
-        public Color onColor = new Color(0.2f, 0.9f, 0.3f);
+        [Tooltip("Colour when ON (the project's 'active' accent colour).")]
+        public Color onColor = new Color(0.2f, 0.95f, 0.35f);
 
         [Tooltip("How strongly the object glows when ON. 0 = no glow.")]
         [Min(0f)] public float onGlow = 2f;

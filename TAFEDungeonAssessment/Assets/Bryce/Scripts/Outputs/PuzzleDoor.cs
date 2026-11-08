@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -6,22 +7,35 @@ namespace PuzzleMechanics
     /// <summary>
     /// A sliding door that opens when its inputs are satisfied.
     ///
+    /// The door can have any number of panels. The prefab has two halves that slide apart,
+    /// but one panel sliding sideways (or up) works too: just change the Panels list.
+    ///
     /// Set 'Input Mode' to All (every input needed) or Any (one input is enough).
     /// You can also call Open(), Close() or Toggle() from a UnityEvent.
     /// </summary>
     public class PuzzleDoor : PuzzleReceiver
     {
-        [Header("Door Parts")]
-        [Tooltip("The moving panel. Give it a kinematic Rigidbody so it pushes objects smoothly.")]
-        public Transform doorPanel;
+        [Serializable]
+        public class SlidingPanel
+        {
+            [Tooltip("The moving part. Give it a kinematic Rigidbody so it pushes objects smoothly.")]
+            public Transform panel;
 
-        [Tooltip("Optional lights on the frame that show whether the door is open.")]
+            [Tooltip("How far this panel moves when the door is fully open (in the door's local space).")]
+            public Vector3 openOffset = new Vector3(1f, 0f, 0f);
+
+            [NonSerialized] public Vector3 closedPosition;
+            [NonSerialized] public Rigidbody body;
+        }
+
+        [Header("Door Parts")]
+        [Tooltip("The panels that slide when the door opens.")]
+        public SlidingPanel[] panels = new SlidingPanel[0];
+
+        [Tooltip("Optional lights on the frame: inactive colour when locked, active colour when unlocked.")]
         public StateVisual statusLights;
 
         [Header("Movement")]
-        [Tooltip("How far the panel moves when fully open, relative to the door (local space).")]
-        public Vector3 openOffset = new Vector3(2.05f, 0f, 0f);
-
         [Tooltip("Seconds to fully open or close.")]
         [Min(0.05f)] public float openDuration = 1f;
 
@@ -36,8 +50,6 @@ namespace PuzzleMechanics
         public UnityEvent onOpened = new UnityEvent();
         public UnityEvent onClosed = new UnityEvent();
 
-        private Vector3 closedLocalPosition;
-        private Rigidbody panelBody;
         private float progress;      // 0 = closed, 1 = open
         private bool lockedOpen;
 
@@ -46,10 +58,12 @@ namespace PuzzleMechanics
 
         private void Awake()
         {
-            if (doorPanel != null)
+            foreach (SlidingPanel p in panels)
             {
-                closedLocalPosition = doorPanel.localPosition;
-                panelBody = doorPanel.GetComponent<Rigidbody>();
+                if (p.panel == null)
+                    continue;
+                p.closedPosition = p.panel.localPosition;
+                p.body = p.panel.GetComponent<Rigidbody>();
             }
 
             if (startOpen)
@@ -112,33 +126,43 @@ namespace PuzzleMechanics
 
         private void FixedUpdate()
         {
-            if (doorPanel == null)
-                return;
-
             progress = Mathf.MoveTowards(progress, IsOpen ? 1f : 0f, Time.fixedDeltaTime / openDuration);
 
-            // SmoothStep eases in and out so the door doesn't start or stop with a jolt.
+            // SmoothStep eases in and out so the panels don't start or stop with a jolt.
             float eased = Mathf.SmoothStep(0f, 1f, progress);
-            Vector3 localTarget = closedLocalPosition + openOffset * eased;
 
-            if (panelBody != null && panelBody.isKinematic)
-                panelBody.MovePosition(doorPanel.parent.TransformPoint(localTarget));
-            else
-                doorPanel.localPosition = localTarget;
+            foreach (SlidingPanel p in panels)
+            {
+                if (p.panel == null)
+                    continue;
+
+                Vector3 localTarget = p.closedPosition + p.openOffset * eased;
+                if (p.body != null && p.body.isKinematic && p.panel.parent != null)
+                    p.body.MovePosition(p.panel.parent.TransformPoint(localTarget));
+                else
+                    p.panel.localPosition = localTarget;
+            }
         }
 
         protected override void OnDrawGizmos()
         {
             base.OnDrawGizmos();
 
-            if (doorPanel == null)
-                return;
-
-            // Show where the panel ends up when open.
+            // Show where each panel ends up when open.
             Gizmos.color = new Color(0.3f, 0.7f, 1f, 0.8f);
-            Vector3 closed = Application.isPlaying ? closedLocalPosition : doorPanel.localPosition;
-            Gizmos.matrix = doorPanel.parent != null ? doorPanel.parent.localToWorldMatrix : Matrix4x4.identity;
-            Gizmos.DrawWireCube(closed + openOffset, doorPanel.localScale);
+            foreach (SlidingPanel p in panels)
+            {
+                if (p == null || p.panel == null || p.panel.parent == null)
+                    continue;
+
+                Vector3 closed = Application.isPlaying ? p.closedPosition : p.panel.localPosition;
+                BoxCollider box = p.panel.GetComponent<BoxCollider>();
+                Vector3 size = box != null ? Vector3.Scale(box.size, p.panel.localScale) : p.panel.localScale;
+                Vector3 centre = box != null ? Vector3.Scale(box.center, p.panel.localScale) : Vector3.zero;
+                Gizmos.matrix = p.panel.parent.localToWorldMatrix;
+                Gizmos.DrawWireCube(closed + centre + p.openOffset, size);
+            }
+            Gizmos.matrix = Matrix4x4.identity;
         }
     }
 }

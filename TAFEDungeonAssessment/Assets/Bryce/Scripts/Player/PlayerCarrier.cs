@@ -35,7 +35,7 @@ namespace PuzzleMechanics
         public float maxDragMass = 150f;
 
         [Header("Carrying")]
-        [Tooltip("How quickly a carried object follows the hold point.")]
+        [Tooltip("How quickly a carried object follows the hold point. Heavier objects follow more slowly.")]
         public float carryResponsiveness = 12f;
         public float maxCarrySpeed = 12f;
 
@@ -46,6 +46,9 @@ namespace PuzzleMechanics
         [Header("Throwing")]
         [Tooltip("Throw impulse. Heavier objects fly slower (speed = impulse / mass).")]
         public float throwImpulse = 220f;
+
+        [Tooltip("Speed limit (m/s) for very light objects, so a small ball isn't thrown like a bullet.")]
+        public float maxThrowSpeed = 16f;
 
         private Rigidbody heldBody;
         private Carryable heldCarryable;
@@ -109,7 +112,9 @@ namespace PuzzleMechanics
             if (isLifting)
             {
                 // Light object: steer its velocity straight towards the hold point.
-                heldBody.linearVelocity = Vector3.ClampMagnitude(toTarget * carryResponsiveness, maxCarrySpeed);
+                // Objects near the lift limit feel sluggish (half speed at the limit).
+                float weightFactor = Mathf.Lerp(1f, 0.5f, heldBody.mass / maxLiftMass);
+                heldBody.linearVelocity = Vector3.ClampMagnitude(toTarget * carryResponsiveness * weightFactor, maxCarrySpeed);
                 heldBody.angularVelocity *= 0.8f;
             }
             else
@@ -183,7 +188,8 @@ namespace PuzzleMechanics
 
             Rigidbody body = heldBody;
             Drop();
-            body.AddForce(playerCamera.transform.forward * throwImpulse, ForceMode.Impulse);
+            float speed = Mathf.Min(throwImpulse / body.mass, maxThrowSpeed);
+            body.AddForce(playerCamera.transform.forward * speed, ForceMode.VelocityChange);
         }
 
         private void ClearHeld()
