@@ -138,6 +138,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PuzzleMechanics.PlayerHUD
   interactor: {fileID: 859353125613970520}
   carrier: {fileID: 5919359431056797131}
+  font: {fileID: 11400000, guid: e9cad287bc331504294039d233020abb, type: 2}
   showControls: 1
 --- !u!1 &7434726197801122255
 GameObject:
@@ -185,7 +186,7 @@ Camera:
   m_ClearFlags: 1
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
   m_projectionMatrixMode: 1
-  m_GateFitMode: 1
+  m_GateFitMode: 2
   m_FOVAxisMode: 0
   m_Iso: 200
   m_ShutterSpeed: 0.005

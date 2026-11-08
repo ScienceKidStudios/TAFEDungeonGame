@@ -7,7 +7,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
+using TMPro;
 using Object = UnityEngine.Object;
 
 namespace PuzzleMechanics.EditorTools
@@ -34,6 +34,12 @@ namespace PuzzleMechanics.EditorTools
         private const string SceneDir = Root + "/Scenes";
         private const string ScenePath = SceneDir + "/MechanicsTestScene.unity";
 
+        // Shared project fonts (SIL Open Font License). If they are missing, TMP's default font is used.
+        private const string BodyFontPath = "Assets/Shared/Fonts/TitilliumWeb/TitilliumWeb-Bold SDF.asset";
+        private const string BodyOutlinePath = "Assets/Shared/Fonts/TitilliumWeb/TitilliumWeb-Bold SDF Outline.mat";
+        private const string HeadingFontPath = "Assets/Shared/Fonts/Rajdhani/Rajdhani-Bold SDF.asset";
+        private const string HeadingOutlinePath = "Assets/Shared/Fonts/Rajdhani/Rajdhani-Bold SDF Outline.mat";
+
         // ------------------------------------------------------------------
         // Menu items
         // ------------------------------------------------------------------
@@ -48,6 +54,10 @@ namespace PuzzleMechanics.EditorTools
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             PrefabSet prefabs = BuildPrefabs();
             BuildTestScene(prefabs);
+
+            // Apply the project's shared lighting polish (post-processing, probes, door lights) if it is in the project.
+            Type polish = Type.GetType("ProjectTools.ScenePolish, Assembly-CSharp-Editor");
+            polish?.GetMethod("PolishActiveScene")?.Invoke(null, null);
 
             AssetDatabase.SaveAssets();
             Debug.Log($"Puzzle Mechanics: prefabs saved to {PrefabDir}, test scene saved to {ScenePath}. Press Play to test.");
@@ -787,6 +797,7 @@ namespace PuzzleMechanics.EditorTools
             PlayerHUD hud = root.AddComponent<PlayerHUD>();
             hud.interactor = interactor;
             hud.carrier = carrier;
+            hud.font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(BodyFontPath);
             return root;
         }
 
@@ -1352,44 +1363,36 @@ namespace PuzzleMechanics.EditorTools
         }
 
         /// <summary>
-        /// A floating world-space text label. It reads correctly when viewed while looking along its +Z
-        /// (use rotationY = 180 for labels that face the other way).
+        /// A floating world-space TextMesh Pro label. It reads correctly when viewed while looking along its +Z
+        /// (use rotationY = 180 for labels that face the other way). Big text uses the heading font.
         /// </summary>
         private static void CreateLabel(Transform parent, string text, Vector3 localPosition, float letterHeight, float width,
             float rotationY = 0f, Color? color = null)
         {
-            const float pixelsPerMetre = 200f;
             int lines = text.Split('\n').Length;
+            bool heading = letterHeight >= 0.3f;
 
-            GameObject canvasObject = new GameObject("Label: " + text.Split('\n')[0], typeof(RectTransform));
-            canvasObject.transform.SetParent(parent, false);
-            Canvas canvas = canvasObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
+            GameObject go = new GameObject("Label: " + text.Split('\n')[0]);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPosition;
+            go.transform.localRotation = Quaternion.Euler(0f, rotationY, 0f);
 
-            RectTransform canvasRect = (RectTransform)canvasObject.transform;
-            canvasRect.localPosition = localPosition;
-            canvasRect.localRotation = Quaternion.Euler(0f, rotationY, 0f);
-            canvasRect.localScale = Vector3.one / pixelsPerMetre;
-            canvasRect.sizeDelta = new Vector2(width, letterHeight * 1.3f * lines) * pixelsPerMetre;
-
-            GameObject textObject = new GameObject("Text", typeof(RectTransform));
-            textObject.transform.SetParent(canvasObject.transform, false);
-            RectTransform textRect = (RectTransform)textObject.transform;
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = Vector2.zero;
-            textRect.offsetMax = Vector2.zero;
-
-            Text label = textObject.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshPro label = go.AddComponent<TextMeshPro>();
+            TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(heading ? HeadingFontPath : BodyFontPath);
+            if (font != null)
+            {
+                label.font = font;
+                // White text with a dark outline stays readable against bright walls and dark sky alike.
+                Material outline = AssetDatabase.LoadAssetAtPath<Material>(heading ? HeadingOutlinePath : BodyOutlinePath);
+                if (outline != null)
+                    label.fontSharedMaterial = outline;
+            }
             label.text = text;
-            label.fontSize = Mathf.RoundToInt(letterHeight * pixelsPerMetre);
-            label.fontStyle = FontStyle.Bold;
-            label.alignment = TextAnchor.MiddleCenter;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
-            label.verticalOverflow = VerticalWrapMode.Overflow;
-            label.color = color ?? new Color(0.1f, 0.1f, 0.12f);
-            label.raycastTarget = false;
+            label.fontSize = letterHeight * 10f;   // TMP world text: font size 10 is about 1 m tall
+            label.alignment = TextAlignmentOptions.Center;
+            label.textWrappingMode = TextWrappingModes.Normal;
+            label.color = color ?? Color.white;
+            label.rectTransform.sizeDelta = new Vector2(width, letterHeight * 1.4f * lines);
         }
 
         private static GameObject SavePrefab(GameObject temp, string folder, string name)

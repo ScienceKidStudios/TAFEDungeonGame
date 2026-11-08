@@ -1,21 +1,26 @@
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace PuzzleMechanics
 {
     /// <summary>
-    /// A very simple on-screen display: crosshair, "what can I do?" prompt and a controls list.
-    /// Uses OnGUI so it needs no Canvas setup.
+    /// A simple on-screen display: crosshair, "what can I do?" prompt and a controls list.
+    /// The canvas is built in code when the game starts, so the prefab needs no UI setup.
     /// </summary>
     public class PlayerHUD : MonoBehaviour
     {
         public PlayerInteractor interactor;
         public PlayerCarrier carrier;
 
+        [Tooltip("Font for the HUD. If empty, TextMesh Pro's default font is used.")]
+        public TMP_FontAsset font;
+
         [Tooltip("Show the controls list in the bottom-left corner.")]
         public bool showControls = true;
 
-        private GUIStyle centerStyle;
-        private GUIStyle cornerStyle;
+        private TextMeshProUGUI promptText;
+        private TextMeshProUGUI messageText;
 
         private void Awake()
         {
@@ -23,38 +28,83 @@ namespace PuzzleMechanics
             if (carrier == null) carrier = GetComponent<PlayerCarrier>();
         }
 
-        private void OnGUI()
+        private void Start()
         {
-            if (centerStyle == null)
-            {
-                centerStyle = new GUIStyle(GUI.skin.label)
-                {
-                    alignment = TextAnchor.MiddleCenter,
-                    fontSize = 18,
-                    fontStyle = FontStyle.Bold
-                };
-                centerStyle.normal.textColor = Color.white;
-                cornerStyle = new GUIStyle(GUI.skin.label) { fontSize = 14 };
-                cornerStyle.normal.textColor = Color.white;
-            }
+            BuildCanvas();
+        }
 
-            float cx = Screen.width * 0.5f;
-            float cy = Screen.height * 0.5f;
+        private void Update()
+        {
+            promptText.text = BuildPrompt();
+            messageText.text = carrier != null && carrier.Message != null ? carrier.Message : "";
+        }
 
-            GUI.Label(new Rect(cx - 10, cy - 12, 20, 24), "+", centerStyle);
-            GUI.Label(new Rect(cx - 300, cy + 30, 600, 30), BuildPrompt(), centerStyle);
+        private void BuildCanvas()
+        {
+            GameObject canvasObject = new GameObject("HUD Canvas");
+            canvasObject.transform.SetParent(transform, false);
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
 
-            if (carrier != null && carrier.Message != null)
-                GUI.Label(new Rect(cx - 300, cy + 60, 600, 30), carrier.Message, centerStyle);
+            // Scales the HUD with the screen so text is the same relative size at any resolution.
+            CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            CreateText(canvas.transform, "Crosshair", "+", 40, Vector2.zero, new Vector2(60f, 60f), TextAlignmentOptions.Center);
+            promptText = CreateText(canvas.transform, "Prompt", "", 30, new Vector2(0f, -70f), new Vector2(1200f, 50f), TextAlignmentOptions.Center);
+            messageText = CreateText(canvas.transform, "Message", "", 26, new Vector2(0f, -115f), new Vector2(1200f, 44f), TextAlignmentOptions.Center);
+            messageText.color = new Color(1f, 0.82f, 0.45f);
 
             if (showControls)
-            {
-                GUI.Label(new Rect(16, Screen.height - 110, 420, 100),
-                    "WASD move   Space jump   Shift sprint\n" +
-                    "E interact (buttons, levers)\n" +
-                    "Hold Left Mouse: carry / drag   Right Mouse: throw\n" +
-                    "Esc: free mouse", cornerStyle);
-            }
+                CreateControlsPanel(canvas.transform);
+        }
+
+        private void CreateControlsPanel(Transform canvas)
+        {
+            GameObject panel = new GameObject("Controls Panel", typeof(RectTransform));
+            panel.transform.SetParent(canvas, false);
+            RectTransform rect = (RectTransform)panel.transform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.zero;
+            rect.anchoredPosition = new Vector2(24f, 24f);
+            rect.sizeDelta = new Vector2(560f, 150f);
+            panel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.5f);
+
+            TextMeshProUGUI controls = CreateText(panel.transform, "Controls",
+                "<b>WASD</b> move   <b>Space</b> jump   <b>Shift</b> sprint\n" +
+                "<b>E</b> use buttons and levers\n" +
+                "<b>Hold Left Mouse</b> carry / drag   <b>Right Mouse</b> throw\n" +
+                "<b>Esc</b> free the mouse",
+                22, Vector2.zero, Vector2.zero, TextAlignmentOptions.MidlineLeft);
+            RectTransform textRect = controls.rectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(16f, 8f);
+            textRect.offsetMax = new Vector2(-16f, -8f);
+        }
+
+        private TextMeshProUGUI CreateText(Transform parent, string name, string text, float size, Vector2 position,
+            Vector2 boxSize, TextAlignmentOptions alignment)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            TextMeshProUGUI tmp = go.AddComponent<TextMeshProUGUI>();
+            if (font != null)
+                tmp.font = font;
+            tmp.text = text;
+            tmp.fontSize = size;
+            tmp.alignment = alignment;
+            tmp.color = Color.white;
+            tmp.raycastTarget = false;
+            // A soft dark outline keeps white text readable on bright walls.
+            tmp.outlineWidth = 0.2f;
+            tmp.outlineColor = new Color32(0, 0, 0, 200);
+
+            tmp.rectTransform.anchoredPosition = position;
+            tmp.rectTransform.sizeDelta = boxSize;
+            return tmp;
         }
 
         private string BuildPrompt()
@@ -70,9 +120,9 @@ namespace PuzzleMechanics
                 Carryable look = carrier.LookTarget();
                 if (look != null)
                 {
-                    if (look.Mass > carrier.maxDragMass) return $"{look.displayName} ({look.Mass:0} kg) - too heavy to move";
-                    if (look.Mass > carrier.maxLiftMass) return $"[LMB] Drag {look.displayName} ({look.Mass:0} kg)";
-                    return $"[LMB] Pick up {look.displayName} ({look.Mass:0} kg)";
+                    if (look.Mass > carrier.maxDragMass) return $"{look.displayName} - too heavy to move";
+                    if (look.Mass > carrier.maxLiftMass) return $"[LMB] Drag {look.displayName}";
+                    return $"[LMB] Pick up {look.displayName}";
                 }
             }
             return "";
