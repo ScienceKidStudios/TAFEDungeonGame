@@ -4,7 +4,7 @@ I apologise for not being present on the day, so I left a small gift which shoul
 
 Have fun with it, and I can't wait to see what you build.
 
-[Teacher's name]
+Bryce
 
 ---
 
