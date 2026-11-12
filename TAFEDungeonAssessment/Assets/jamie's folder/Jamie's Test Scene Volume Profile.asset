@@ -545,16 +545,16 @@ MonoBehaviour:
     m_Value: 2
   m_RayLength:
     m_OverrideState: 0
-    m_Value: 50
+    m_Value: 3
   m_SampleCount:
     m_OverrideState: 0
-    m_Value: 1
+    m_Value: 2
   m_Denoise:
     m_OverrideState: 0
     m_Value: 1
   m_DenoiserRadius:
     m_OverrideState: 0
-    m_Value: 1
+    m_Value: 0.5
 --- !u!114 &8969685857152061055
 MonoBehaviour:
   m_ObjectHideFlags: 3
